@@ -1,0 +1,1 @@
+{"name":"Ragdoll_Module","className":"DataModel","filePaths":["default.project.json"],"children":[{"name":"ReplicatedStorage","className":"ReplicatedStorage","children":[{"name":"Shared","className":"Folder","children":[{"name":"Ragdoll","className":"ModuleScript","filePaths":["src\\Ragdoll.luau"]}]}]}]}
