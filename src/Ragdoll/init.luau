@@ -169,10 +169,9 @@ function _ragdoll:MakeRagdollClone(character: Model?, playerAttach: boolean?) : 
     self._Character.PrimaryPart = oldCharacter.PrimaryPart
     self._Character:PivotTo(oldCharacter:GetPivot())
 
-    self._Character.Name = oldCharacter.Name
+    self._Character.Name = oldCharacter.Name.."_RAGDOLL"
 
     if playerAttach then
-        player.Character = self._Character
         oldCharacter:Destroy()
     end
 
