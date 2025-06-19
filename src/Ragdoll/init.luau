@@ -146,12 +146,7 @@ end
     enabled: Model? -- self-explainatory.
 ]=]
 function _ragdoll:toggleRagdollCharacter(character: Model?, enabled: boolean?)
-    if character then
-        self.Character = character
-    end
-    self.Humanoid = self.Character:FindFirstChildOfClass("Humanoid") :: Humanoid
-    setupHumamoid(self.Humanoid, enabled)
-    setMotor6D(character, not enabled)
+    self:ToggleRagdoll(character, enabled)
 end
 
 
