@@ -1,23 +1,17 @@
 --!nocheck
 local Players = game.Players
-local ragdollRF = script.RagdollRF
-local ragdoll = {
-    __index = {
-        className = "Ragdoll",
-        isRagdoll = false
-    }
-}
-
+local ragdollRE = script.RagdollRE
+local ragdoll = {}
+local _ragdoll = {__index = ragdoll}
 export type Ragdoll = {
     isRagdoll: boolean,
     Character: Model,
     Humanoid: Humanoid,
-    Template: Model
+    Template: Model,
+    ToggleRagdoll: (character: Model?, enabled: boolean?) -> (),
+    toggleRagdollCharacter: (character: Model?, enabled: boolean?) -> (),
+    MakeRagdollClone: (character: Model?, playerAttach: boolean?) -> ()
 }
-
-function ragdoll.__index:GetRagdollType()
-    return self.isRagdoll
-end
 
 local function setupRagdoll(character: Model)
     local bodyParts = {
@@ -56,6 +50,8 @@ local function setupRagdoll(character: Model)
         [character.Torso["Right Hip"]] = {CFrame.new(1, -1, 0), CFrame.new(0.5, 1, 0)}
     }
 
+    local rootPart = character:FindFirstChild("HumanoidRootPart") :: BasePart
+
     for joint, value in jointData do
         local attachment0 = Instance.new("Attachment")
         attachment0.CFrame = value[1]
@@ -75,9 +71,9 @@ local function setupRagdoll(character: Model)
         ragdollJoint.TwistLowerAngle = -45
         ragdollJoint.TwistUpperAngle = 45
 
-        ragdollJoint.UpperAngle = joint.Part1 == character:FindFirstChild("")
+        ragdollJoint.UpperAngle = joint.Part1 == character:FindFirstChild("Head") and 45 or 90
 
-        attachment0.Parent = joint.Part0
+        attachment0.Parent = rootPart
         attachment1.Parent = joint.Part1
         ragdollJoint.Parent = joint.Part1
     end
@@ -110,46 +106,99 @@ end
     character: Model -- Character for setting up a Ragdoll.
 ]=]
 function ragdoll.new(character: Model) : {}
-    local self = setmetatable({}:: Ragdoll, {__index = ragdoll})
+    local self = {} :: Ragdoll
+    setmetatable(self, {__index = _ragdoll})
     self.Character = character
-    self.Humanoid = self.Character:FindFirstChild("Humanoid") :: Humanoid
+    self.Humanoid = self.Character:FindFirstChildOfClass("Humanoid") :: Humanoid
     self.Humanoid.RequiresNeck = true
     self.Humanoid.BreakJointsOnDeath = false
+
+    self.isRagdoll = false :: boolean
+
+    setupRagdoll(self.Character)
     return self
 end
 
-function ragdoll:SetRagdoll(enabled: boolean)
-    self.Template = script:FindFirstChild("RagdollTemplate"):Clone() :: Model
+local function setupHumamoid(humanoid: Humanoid, enabled: boolean?)
+    humanoid.PlatformStand = enabled
+    humanoid.AutoRotate = not enabled
+    humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, not enabled)
+    humanoid:SetStateEnabled(Enum.HumanoidStateType.GettingUp, not enabled)
+end
+
+--[=[
+    Toggles Ragdoll for Character.
+    character: Model? -- Character for toggling Ragdoll.
+    enabled: Model? -- self-explainatory.
+]=]
+function _ragdoll:ToggleRagdoll(character: Model?, enabled: boolean?)
+    if character then
+        self.Character = character
+    end
+    self.Humanoid = self.Character:FindFirstChildOfClass("Humanoid") :: Humanoid
+    setupHumamoid(self.Humanoid, enabled)
+    setMotor6D(character, not enabled)
+end
+
+--[=[
+    Toggles Ragdoll for Character. Deprecated naming for ToggleRagdoll() method.
+    character: Model? -- Character for toggling Ragdoll.
+    enabled: Model? -- self-explainatory.
+]=]
+function _ragdoll:toggleRagdollCharacter(character: Model?, enabled: boolean?)
+    if character then
+        self.Character = character
+    end
+    self.Humanoid = self.Character:FindFirstChildOfClass("Humanoid") :: Humanoid
+    setupHumamoid(self.Humanoid, enabled)
+    setMotor6D(character, not enabled)
+end
+
+
+--[=[
+    Clones your character and ragdolles it.
+    character: Model? -- Character for Ragdoll Clone.
+    playerAttach: boolean? -- Whether will player be attached to this Clone.
+]=]
+function _ragdoll:MakeRagdollClone(character: Model?, playerAttach: boolean?) : ()
+    if character then
+        self.Character = character
+    end
     local oldCharacter = self.Character
     local player = Players:GetPlayerFromCharacter(self.Character)
 
-    for _, instance in pairs(oldCharacter:GetChildren()) do
-        if instance:IsA("Humanoid") then
-            return
-        end
-        instance = instance:Clone()
-        instance.Parent = self.Template
-    end
+    self.Character.Archivable = true
+    self._Character = oldCharacter:Clone()
+    self.Character.Archivable = false
 
-    self.Template.Name = tostring(player).."_RAGDOLL"
-    setupRagdoll(self.Template)
+    self._Character.PrimaryPart = oldCharacter.PrimaryPart
+    self._Character:PivotTo(oldCharacter:GetPivot())
 
-    self.Template.PrimaryPart = oldCharacter.PrimaryPart
-    self.Template:PivotTo(oldCharacter:GetPivot())
+    self._Character.Name = oldCharacter.Name
 
-    if enabled then
-        self.Character = self.Template
+    if playerAttach then
+        player.Character = self._Character
         oldCharacter:Destroy()
-        self.Template.Parent = workspace
-    else
-        self.Template:Destroy()
     end
 
-    setMotor6D(self.Character, not enabled)
-    self.Humanoid = self.Character:FindFirstChild("Humanoid") :: Humanoid
-    self.Humanoid.PlatformStand = enabled
-    ragdollRF:InvokeClient(player, self.Humanoid)
-    self.isRagdoll = enabled
+    self._Character:FindFirstChild("Health"):Destroy()
+
+    self._Character.Parent = workspace
+    self._Humanoid = self._Character:FindFirstChildOfClass("Humanoid") :: Humanoid
+    setupHumamoid(self._Humanoid, true)
+    setMotor6D(self._Character, false)
+    local rootPart = self._Character:FindFirstChild("HumanoidRootPart") :: BasePart
+    local owner = playerAttach and player or nil
+    rootPart:SetNetworkOwner(owner)
+
+    if playerAttach then
+        ragdollRE:FireClient(player, self._Humanoid)
+    end
+    self.isRagdoll = true
+end
+
+function _ragdoll:GetRagdollType()
+    return self.isRagdoll
 end
 
 return ragdoll
