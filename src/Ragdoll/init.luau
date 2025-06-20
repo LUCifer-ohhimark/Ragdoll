@@ -1,5 +1,7 @@
 --!nocheck
 local Players = game.Players
+local TS = game:GetService("TweenService")
+local Debris = game:GetService("Debris")
 local ragdollRE = script.RagdollRE
 local ragdoll = {}
 local _ragdoll = {__index = ragdoll}
@@ -120,11 +122,13 @@ function ragdoll.new(character: Model) : {}
 end
 
 local function setupHumamoid(humanoid: Humanoid, enabled: boolean?)
-    humanoid.PlatformStand = enabled
-    humanoid.AutoRotate = not enabled
     humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, not enabled)
     humanoid:SetStateEnabled(Enum.HumanoidStateType.GettingUp, not enabled)
+    humanoid.PlatformStand = enabled
+    humanoid.AutoRotate = not enabled
 end
+
+local modelCFrame: CFrame
 
 --[=[
     Toggles Ragdoll for Character.
@@ -135,9 +139,28 @@ function _ragdoll:ToggleRagdoll(character: Model?, enabled: boolean?)
     if character then
         self.Character = character
     end
+    if enabled then
+        modelCFrame = character:GetPivot()
+    end
+    local rootPart = self.Character:FindFirstChild("HumanoidRootPart")
     self.Humanoid = self.Character:FindFirstChildOfClass("Humanoid") :: Humanoid
     setupHumamoid(self.Humanoid, enabled)
     setMotor6D(character, not enabled)
+    if not enabled then
+        local alignOrientation = Instance.new("AlignOrientation")
+        alignOrientation.Attachment0 = rootPart.RootAttachment
+        alignOrientation.AlignType = Enum.AlignType.AllAxes
+        alignOrientation.Mode = Enum.OrientationAlignmentMode.OneAttachment
+        alignOrientation.MaxTorque = math.huge
+        alignOrientation.MaxAngularVelocity = math.huge
+        alignOrientation.Responsiveness = math.huge
+        alignOrientation.CFrame = modelCFrame
+        alignOrientation.RigidityEnabled = true
+
+        alignOrientation.Parent = rootPart
+
+        Debris:AddItem(alignOrientation, .125)
+    end
 end
 
 --[=[
@@ -155,7 +178,7 @@ end
     character: Model? -- Character for Ragdoll Clone.
     playerAttach: boolean? -- Whether will player be attached to this Clone.
 ]=]
-function _ragdoll:MakeRagdollClone(character: Model?, playerAttach: boolean?) : ()
+function _ragdoll:MakeRagdollClone(character: Model?, playerAttach: boolean?, timeout: number?) : ()
     if character then
         self.Character = character
     end
@@ -188,6 +211,27 @@ function _ragdoll:MakeRagdollClone(character: Model?, playerAttach: boolean?) : 
     if playerAttach then
         ragdollRE:FireClient(player, self._Humanoid)
     end
+
+    local tweenTable = {}
+
+    for _, obj in self._Character:GetDescendants() do
+        if obj:IsA("BasePart") or obj:IsA("MeshPart") or obj:IsA("Decal") then
+            table.insert(tweenTable, obj)
+        end
+    end
+
+    if timeout then
+        task.delay(timeout / 2, function()
+            for _, obj in tweenTable do
+                local tween = TS:Create(obj, TweenInfo.new(timeout / 2), {Transparency = 1})
+                tween:Play()
+                tween.Completed:Once(function()
+                    self._Character:Destroy()
+                end)
+            end
+        end)
+    end
+
     self.isRagdoll = true
 end
 
