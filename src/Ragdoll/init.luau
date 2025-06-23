@@ -1,8 +1,8 @@
 --!nocheck
 local Players = game.Players
 local TS = game:GetService("TweenService")
-local Debris = game:GetService("Debris")
 local ragdollRE = script.RagdollRE
+local motorRE = script.MotorRE
 local ragdoll = {}
 local _ragdoll = {__index = ragdoll}
 export type Ragdoll = {
@@ -25,11 +25,11 @@ local function setupRagdoll(character: Model)
         character:FindFirstChild("Right Arm")
     }
 
-    local partSize = Vector3.new(.5, .5, .5)
+    -- local partSize = Vector3.new(.5, .5, .5)
     for i, _ in bodyParts do
         local part = Instance.new("Part")
         part.Name = "RAGDOLL_COLLIDER"
-        part.Size = partSize
+        part.Size = bodyParts[i].Size / 2
         part.CanCollide = false
         part.CFrame = bodyParts[i].CFrame
         part.Transparency = 1
@@ -83,24 +83,14 @@ end
 
 local function setMotor6D(character: Model, enabled: boolean)
     for _, v in character:GetDescendants() do
-        if v.Name == "RootJoint" or v.Name == "Neck" or v.Name == "Handle" then 
-            continue 
-        end
-
-        if v:IsA("BallSocketConstraint") then 
-            v.Enabled = not enabled 
-        end
-
         if v:IsA("BasePart") then
             if v:HasTag("Ragdoll") then 
-                v.CanCollide = not enabled 
+                v.CanCollide = not enabled
             end
         end
-
-        if v:IsA("Motor6D") then 
-            v.Enabled = enabled
-        end
     end
+
+    motorRE:FireAllClients(character, enabled)
 end
 
 --[=[
@@ -118,6 +108,10 @@ function ragdoll.new(character: Model) : {}
     self.isRagdoll = false :: boolean
 
     setupRagdoll(self.Character)
+
+    self.Humanoid.StateChanged:Connect(function(old: Enum.HumanoidStateType, new: Enum.HumanoidStateType)
+        print(old.Name, new.Name)
+    end)
     return self
 end
 
@@ -129,7 +123,6 @@ local function setupHumamoid(humanoid: Humanoid, enabled: boolean?)
 end
 
 local modelCFrame: CFrame
-
 --[=[
     Toggles Ragdoll for Character.
     character: Model? -- Character for toggling Ragdoll.
@@ -142,24 +135,16 @@ function _ragdoll:ToggleRagdoll(character: Model?, enabled: boolean?)
     if enabled then
         modelCFrame = character:GetPivot()
     end
-    local rootPart = self.Character:FindFirstChild("HumanoidRootPart")
     self.Humanoid = self.Character:FindFirstChildOfClass("Humanoid") :: Humanoid
     setupHumamoid(self.Humanoid, enabled)
     setMotor6D(character, not enabled)
+
     if not enabled then
-        local alignOrientation = Instance.new("AlignOrientation")
-        alignOrientation.Attachment0 = rootPart.RootAttachment
-        alignOrientation.AlignType = Enum.AlignType.AllAxes
-        alignOrientation.Mode = Enum.OrientationAlignmentMode.OneAttachment
-        alignOrientation.MaxTorque = math.huge
-        alignOrientation.MaxAngularVelocity = math.huge
-        alignOrientation.Responsiveness = math.huge
-        alignOrientation.CFrame = modelCFrame
-        alignOrientation.RigidityEnabled = true
-
-        alignOrientation.Parent = rootPart
-
-        Debris:AddItem(alignOrientation, .125)
+        local characterPivot = character:GetPivot()
+        local characterPos = characterPivot.Position
+        character:PivotTo(
+            CFrame.new(characterPos.X, characterPos.Y + 2, characterPos.Z) * modelCFrame.Rotation
+        )
     end
 end
 
