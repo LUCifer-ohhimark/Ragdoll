@@ -5,14 +5,17 @@ local ragdollRE = script.RagdollRE
 local motorRE = script.MotorRE
 local ragdoll = {}
 local _ragdoll = {__index = ragdoll}
+
+local isRagdoll: boolean = false
+
 export type Ragdoll = {
-    isRagdoll: boolean,
     Character: Model,
     Humanoid: Humanoid,
     Template: Model,
     ToggleRagdoll: (character: Model?, enabled: boolean?) -> (),
     toggleRagdollCharacter: (character: Model?, enabled: boolean?) -> (),
-    MakeRagdollClone: (character: Model?, playerAttach: boolean?) -> ()
+	MakeRagdollClone: (character: Model?, playerAttach: boolean?) -> (),
+	GetRagdollState: () -> ()
 }
 
 local function setupRagdoll(character: Model)
@@ -105,7 +108,7 @@ function ragdoll.new(character: Model) : {}
     self.Humanoid.RequiresNeck = true
     self.Humanoid.BreakJointsOnDeath = false
 
-    self.isRagdoll = false :: boolean
+    isRagdoll = false
 
     setupRagdoll(self.Character)
 
@@ -137,7 +140,9 @@ function _ragdoll:ToggleRagdoll(character: Model?, enabled: boolean?)
     end
     self.Humanoid = self.Character:FindFirstChildOfClass("Humanoid") :: Humanoid
     setupHumamoid(self.Humanoid, enabled)
-    setMotor6D(character, not enabled)
+	setMotor6D(character, not enabled)
+	
+	isRagdoll = enabled
 
     if not enabled then
         local characterPivot = character:GetPivot()
@@ -216,12 +221,10 @@ function _ragdoll:MakeRagdollClone(character: Model?, playerAttach: boolean?, ti
             end
         end)
     end
-
-    self.isRagdoll = true
 end
 
-function _ragdoll:GetRagdollType()
-    return self.isRagdoll
+function ragdoll:GetRagdollState()
+    return isRagdoll
 end
 
 return ragdoll
