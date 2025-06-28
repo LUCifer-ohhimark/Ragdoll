@@ -111,10 +111,6 @@ function ragdoll.new(character: Model) : {}
     isRagdoll = false
 
     setupRagdoll(self.Character)
-
-    self.Humanoid.StateChanged:Connect(function(old: Enum.HumanoidStateType, new: Enum.HumanoidStateType)
-        print(old.Name, new.Name)
-    end)
     return self
 end
 
@@ -140,6 +136,10 @@ function _ragdoll:ToggleRagdoll(character: Model?, enabled: boolean?)
     end
     self.Humanoid = self.Character:FindFirstChildOfClass("Humanoid") :: Humanoid
     setupHumamoid(self.Humanoid, enabled)
+
+    if Players:GetPlayerFromCharacter(character) then
+        character:FindFirstChild("HumanoidRootPart"):SetNetworkOwner(Players:GetPlayerFromCharacter(character))
+    end
 	setMotor6D(character, not enabled)
 	
 	isRagdoll = enabled
