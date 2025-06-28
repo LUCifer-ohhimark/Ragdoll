@@ -15,4 +15,4 @@ Sync the source code with roblox place using:
 rojo serve
 ```
 It will make the module appear in *ReplicatedStorage/Shared*.
-Made with Rojo.
+>Made with Rojo.
