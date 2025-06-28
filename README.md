@@ -1,6 +1,9 @@
 # Ragdoll_Module
 A module that obviously makes ragdolls.
 
+## Known Issues
+Ragdolls don't work normally on all clients except of owned one.
+
 ## Building
 To build the module from scratch, run:
 
