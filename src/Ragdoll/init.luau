@@ -1,13 +1,11 @@
 --!nocheck
 local Players = game.Players
-local TS = game:GetService("TweenService")
-local ragdollRE = script.RagdollRE
-local motorRE = script.MotorRE
+local ragdollCloneRE = script.RagdollCloneRE
+local clientRagdollRE = script.ClientRagdollRE
 local ragdoll = {}
 local _ragdoll = {__index = ragdoll}
 
 local isRagdoll: boolean = false
-
 export type Ragdoll = {
     Character: Model,
     Humanoid: Humanoid,
@@ -84,7 +82,14 @@ local function setupRagdoll(character: Model)
     end
 end
 
-local function setMotor6D(character: Model, enabled: boolean)
+local function setupHumamoid(humanoid: Humanoid, enabled: boolean?)
+    humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, not enabled)
+    humanoid:SetStateEnabled(Enum.HumanoidStateType.GettingUp, not enabled)
+    humanoid.PlatformStand = enabled
+    humanoid.AutoRotate = not enabled
+end
+
+local function fireRagdoll(character: Model, enabled: boolean)
     for _, v in character:GetDescendants() do
         if v:IsA("BasePart") then
             if v:HasTag("Ragdoll") then 
@@ -92,8 +97,8 @@ local function setMotor6D(character: Model, enabled: boolean)
             end
         end
     end
-
-    motorRE:FireAllClients(character, enabled)
+    setupHumamoid(character:WaitForChild("Humanoid"), enabled)
+    clientRagdollRE:FireAllClients(character, enabled)
 end
 
 --[=[
@@ -114,49 +119,45 @@ function ragdoll.new(character: Model) : {}
     return self
 end
 
-local function setupHumamoid(humanoid: Humanoid, enabled: boolean?)
-    humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, not enabled)
-    humanoid:SetStateEnabled(Enum.HumanoidStateType.GettingUp, not enabled)
-    humanoid.PlatformStand = enabled
-    humanoid.AutoRotate = not enabled
-end
-
 local modelCFrame: CFrame
 --[=[
     Toggles Ragdoll for Character.
     character: Model? -- Character for toggling Ragdoll.
-    enabled: Model? -- self-explainatory.
+    enabled: boolean? -- self-explainatory.
 ]=]
 function _ragdoll:ToggleRagdoll(character: Model?, enabled: boolean?)
     if character then
         self.Character = character
     end
+
     if enabled then
         modelCFrame = character:GetPivot()
     end
-    self.Humanoid = self.Character:FindFirstChildOfClass("Humanoid") :: Humanoid
-    setupHumamoid(self.Humanoid, enabled)
 
-    if Players:GetPlayerFromCharacter(character) then
-        character:FindFirstChild("HumanoidRootPart"):SetNetworkOwner(Players:GetPlayerFromCharacter(character))
+    local player = Players:GetPlayerFromCharacter(character)
+    local rootPart = character:FindFirstChild("HumanoidRootPart") :: BasePart
+
+    if enabled and player then
+        rootPart:SetNetworkOwner(player)
     end
-	setMotor6D(character, not enabled)
-	
+
+    fireRagdoll(character, enabled)
+    
 	isRagdoll = enabled
 
     if not enabled then
         local characterPivot = character:GetPivot()
         local characterPos = characterPivot.Position
-        character:PivotTo(
-            CFrame.new(characterPos.X, characterPos.Y + 2, characterPos.Z) * modelCFrame.Rotation
-        )
+
+        local position = CFrame.new(characterPos.X, characterPos.Y, characterPos.Z)
+        character:PivotTo(position * modelCFrame.Rotation)
     end
 end
 
 --[=[
     Toggles Ragdoll for Character. Deprecated naming for ToggleRagdoll() method.
     character: Model? -- Character for toggling Ragdoll.
-    enabled: Model? -- self-explainatory.
+    enabled: boolean? -- self-explainatory.
 ]=]
 function _ragdoll:toggleRagdollCharacter(character: Model?, enabled: boolean?)
     self:ToggleRagdoll(character, enabled)
@@ -192,33 +193,18 @@ function _ragdoll:MakeRagdollClone(character: Model?, playerAttach: boolean?, ti
 
     self._Character.Parent = workspace
     self._Humanoid = self._Character:FindFirstChildOfClass("Humanoid") :: Humanoid
-    setupHumamoid(self._Humanoid, true)
-    setMotor6D(self._Character, false)
+    fireRagdoll(character, true)
     local rootPart = self._Character:FindFirstChild("HumanoidRootPart") :: BasePart
     local owner = playerAttach and player or nil
     rootPart:SetNetworkOwner(owner)
 
     if playerAttach then
-        ragdollRE:FireClient(player, self._Humanoid)
+        ragdollCloneRE:FireClient(player, self._Humanoid)
     end
-
-    local tweenTable = {}
-
-    for _, obj in self._Character:GetDescendants() do
-        if obj:IsA("BasePart") or obj:IsA("MeshPart") or obj:IsA("Decal") then
-            table.insert(tweenTable, obj)
-        end
-    end
-
+    
     if timeout then
-        task.delay(timeout / 2, function()
-            for _, obj in tweenTable do
-                local tween = TS:Create(obj, TweenInfo.new(timeout / 2), {Transparency = 1})
-                tween:Play()
-                tween.Completed:Once(function()
-                    self._Character:Destroy()
-                end)
-            end
+        task.delay(timeout, function()
+            self._Character:Destroy()
         end)
     end
 end
