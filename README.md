@@ -1,4 +1,4 @@
-# Ragdoll_Module
+# Ragdoll Module
 A module that obviously makes ragdolls.
 
 ## Known Issues
