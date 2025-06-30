@@ -1,7 +1,6 @@
 --!nocheck
 local Players = game.Players
 local ragdollCloneRE = script.RagdollCloneRE
-local clientRagdollRE = script.ClientRagdollRE
 local ragdoll = {}
 local _ragdoll = {__index = ragdoll}
 
@@ -26,7 +25,6 @@ local function setupRagdoll(character: Model)
         character:FindFirstChild("Right Arm")
     }
 
-    -- local partSize = Vector3.new(.5, .5, .5)
     for i, _ in bodyParts do
         local part = Instance.new("Part")
         part.Name = "RAGDOLL_COLLIDER"
@@ -89,16 +87,31 @@ local function setupHumamoid(humanoid: Humanoid, enabled: boolean?)
     humanoid.AutoRotate = not enabled
 end
 
-local function fireRagdoll(character: Model, enabled: boolean)
-    for _, v in character:GetDescendants() do
-        if v:IsA("BasePart") then
-            if v:HasTag("Ragdoll") then 
-                v.CanCollide = not enabled
+local function toggleMotor6D(character: Model?, enabled: boolean?)
+    for _, instance in character:GetDescendants() do
+        if instance.Name == "RootJoint" or instance.Name == "Neck" then
+            continue
+        end
+
+        if instance:IsA("BasePart") then
+            if instance:HasTag("Ragdoll") then
+                instance.CanCollide = not enabled
             end
         end
+
+        if instance:IsA("Motor6D") then
+            instance.Enabled = enabled
+        end
+
+        if instance:IsA("BallSocketConstraint") then
+            instance.Enabled = not enabled
+        end
     end
+end
+
+local function fireRagdoll(character: Model, enabled: boolean)
+    toggleMotor6D(character, not enabled)
     setupHumamoid(character:WaitForChild("Humanoid"), enabled)
-    clientRagdollRE:FireAllClients(character, enabled)
 end
 
 --[=[
@@ -137,8 +150,12 @@ function _ragdoll:ToggleRagdoll(character: Model?, enabled: boolean?)
     local player = Players:GetPlayerFromCharacter(character)
     local rootPart = character:FindFirstChild("HumanoidRootPart") :: BasePart
 
-    if enabled and player then
-        rootPart:SetNetworkOwner(player)
+    if enabled then
+        if player then
+            rootPart:SetNetworkOwner(player)
+        else
+            rootPart:SetNetworkOwner(nil)
+        end
     end
 
     fireRagdoll(character, enabled)
@@ -193,9 +210,14 @@ function _ragdoll:MakeRagdollClone(character: Model?, playerAttach: boolean?, ti
 
     self._Character.Parent = workspace
     self._Humanoid = self._Character:FindFirstChildOfClass("Humanoid") :: Humanoid
-    fireRagdoll(character, true)
+    fireRagdoll(self._Character, true)
     local rootPart = self._Character:FindFirstChild("HumanoidRootPart") :: BasePart
-    local owner = playerAttach and player or nil
+    local owner
+    if not player then
+        owner = nil 
+    else
+        owner = playerAttach and player or nil
+    end
     rootPart:SetNetworkOwner(owner)
 
     if playerAttach then
