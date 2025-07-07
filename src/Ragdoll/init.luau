@@ -2,13 +2,11 @@
 local Players = game.Players
 local ragdollCloneRE = script.RagdollCloneRE
 local ragdoll = {}
-local _ragdoll = {__index = ragdoll}
+
+local lastChar: Model
 
 local isRagdoll: boolean = false
 export type Ragdoll = {
-    Character: Model,
-    Humanoid: Humanoid,
-    Template: Model,
     ToggleRagdoll: (character: Model?, enabled: boolean?) -> (),
     toggleRagdollCharacter: (character: Model?, enabled: boolean?) -> (),
 	MakeRagdollClone: (character: Model?, playerAttach: boolean?) -> (),
@@ -120,15 +118,14 @@ end
 ]=]
 function ragdoll.new(character: Model) : {}
     local self = {} :: Ragdoll
-    setmetatable(self, {__index = _ragdoll})
-    self.Character = character
-    self.Humanoid = self.Character:FindFirstChildOfClass("Humanoid") :: Humanoid
-    self.Humanoid.RequiresNeck = true
-    self.Humanoid.BreakJointsOnDeath = false
+    lastChar = character
+    local humanoid = lastChar:FindFirstChildOfClass("Humanoid") :: Humanoid
+    humanoid.RequiresNeck = true
+    humanoid.BreakJointsOnDeath = false
 
     isRagdoll = false
 
-    setupRagdoll(self.Character)
+    setupRagdoll(lastChar)
     return self
 end
 
@@ -138,7 +135,7 @@ local modelCFrame: CFrame
     character: Model? -- Character for toggling Ragdoll.
     enabled: boolean? -- self-explainatory.
 ]=]
-function _ragdoll:ToggleRagdoll(character: Model?, enabled: boolean?)
+function ragdoll:ToggleRagdoll(character: Model?, enabled: boolean?)
     if character then
         self.Character = character
     end
@@ -176,8 +173,8 @@ end
     character: Model? -- Character for toggling Ragdoll.
     enabled: boolean? -- self-explainatory.
 ]=]
-function _ragdoll:toggleRagdollCharacter(character: Model?, enabled: boolean?)
-    self:ToggleRagdoll(character, enabled)
+function ragdoll:toggleRagdollCharacter(character: Model?, enabled: boolean?)
+    ragdoll:ToggleRagdoll(character, enabled)
 end
 
 
@@ -186,32 +183,32 @@ end
     character: Model? -- Character for Ragdoll Clone.
     playerAttach: boolean? -- Whether will player be attached to this Clone.
 ]=]
-function _ragdoll:MakeRagdollClone(character: Model?, playerAttach: boolean?, timeout: number?) : ()
+function ragdoll:MakeRagdollClone(character: Model?, playerAttach: boolean?, timeout: number?) : ()
     if character then
-        self.Character = character
+        lastChar = character
     end
-    local oldCharacter = self.Character
-    local player = Players:GetPlayerFromCharacter(self.Character)
+    local oldCharacter = lastChar
+    local player = Players:GetPlayerFromCharacter(lastChar)
 
-    self.Character.Archivable = true
-    self._Character = oldCharacter:Clone()
-    self.Character.Archivable = false
+    lastChar.Archivable = true
+    local _character = oldCharacter:Clone()
+    lastChar.Archivable = false
 
-    self._Character.PrimaryPart = oldCharacter.PrimaryPart
-    self._Character:PivotTo(oldCharacter:GetPivot())
+    _character.PrimaryPart = oldCharacter.PrimaryPart
+    _character:PivotTo(oldCharacter:GetPivot())
 
-    self._Character.Name = oldCharacter.Name.."_RAGDOLL"
+    _character.Name = oldCharacter.Name.."_RAGDOLL"
 
     if playerAttach then
         oldCharacter:Destroy()
     end
 
-    self._Character:FindFirstChild("Health"):Destroy()
+    _character:FindFirstChild("Health"):Destroy()
 
-    self._Character.Parent = workspace
-    self._Humanoid = self._Character:FindFirstChildOfClass("Humanoid") :: Humanoid
-    fireRagdoll(self._Character, true)
-    local rootPart = self._Character:FindFirstChild("HumanoidRootPart") :: BasePart
+    _character.Parent = workspace
+    local _humanoid = _character:FindFirstChildOfClass("Humanoid") :: Humanoid
+    fireRagdoll(_character, true)
+    local rootPart = _character:FindFirstChild("HumanoidRootPart") :: BasePart
     local owner
     if not player then
         owner = nil 
@@ -221,12 +218,12 @@ function _ragdoll:MakeRagdollClone(character: Model?, playerAttach: boolean?, ti
     rootPart:SetNetworkOwner(owner)
 
     if playerAttach then
-        ragdollCloneRE:FireClient(player, self._Humanoid)
+        ragdollCloneRE:FireClient(player, _humanoid)
     end
     
     if timeout then
         task.delay(timeout, function()
-            self._Character:Destroy()
+            _character:Destroy()
         end)
     end
 end
