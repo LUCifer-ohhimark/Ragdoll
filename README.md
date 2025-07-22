@@ -1,7 +1,7 @@
 # Ragdoll Module
 A module that obviously makes ragdolls.
 
-## Building
+## Syncing
 Sync the source code with roblox place using:
 ```bash
 rojo serve
