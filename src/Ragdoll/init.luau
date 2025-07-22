@@ -4,8 +4,6 @@ local ragdollCloneRE = script.RagdollCloneRE
 local ragdoll = {}
 
 local lastChar: Model
-
-local isRagdoll: boolean = false
 export type Ragdoll = {
     ToggleRagdoll: (character: Model?, enabled: boolean?) -> (),
     toggleRagdollCharacter: (character: Model?, enabled: boolean?) -> (),
@@ -123,13 +121,14 @@ function ragdoll.new(character: Model) : {}
     humanoid.RequiresNeck = true
     humanoid.BreakJointsOnDeath = false
 
-    isRagdoll = false
+    lastChar:SetAttribute("isRagdoll", false)
 
     setupRagdoll(lastChar)
     return self
 end
 
 local modelCFrame: CFrame
+
 --[=[
     Toggles Ragdoll for Character.
     character: Model? -- Character for toggling Ragdoll.
@@ -137,34 +136,30 @@ local modelCFrame: CFrame
 ]=]
 function ragdoll:ToggleRagdoll(character: Model?, enabled: boolean?)
     if character then
-        self.Character = character
+        lastChar = character
     end
 
     if enabled then
-        modelCFrame = character:GetPivot()
+        modelCFrame = lastChar:GetPivot()
     end
 
-    local player = Players:GetPlayerFromCharacter(character)
-    local rootPart = character:FindFirstChild("HumanoidRootPart") :: BasePart
+    local player = Players:GetPlayerFromCharacter(lastChar)
+    local rootPart = lastChar:FindFirstChild("HumanoidRootPart") :: BasePart
 
     if enabled then
-        if player then
-            rootPart:SetNetworkOwner(player)
-        else
-            rootPart:SetNetworkOwner(nil)
-        end
+        rootPart:SetNetworkOwner(player)
     end
 
-    fireRagdoll(character, enabled)
+    fireRagdoll(lastChar, enabled)
     
-	isRagdoll = enabled
+	lastChar:SetAttribute("isRagdoll", enabled)
 
     if not enabled then
-        local characterPivot = character:GetPivot()
+        local characterPivot = lastChar:GetPivot()
         local characterPos = characterPivot.Position
 
         local position = CFrame.new(characterPos.X, characterPos.Y, characterPos.Z)
-        character:PivotTo(position * modelCFrame.Rotation)
+        lastChar:PivotTo(position * modelCFrame.Rotation)
     end
 end
 
@@ -209,12 +204,7 @@ function ragdoll:MakeRagdollClone(character: Model?, playerAttach: boolean?, tim
     local _humanoid = _character:FindFirstChildOfClass("Humanoid") :: Humanoid
     fireRagdoll(_character, true)
     local rootPart = _character:FindFirstChild("HumanoidRootPart") :: BasePart
-    local owner
-    if not player then
-        owner = nil 
-    else
-        owner = playerAttach and player or nil
-    end
+    local owner = playerAttach and player or nil
     rootPart:SetNetworkOwner(owner)
 
     if playerAttach then
@@ -228,8 +218,11 @@ function ragdoll:MakeRagdollClone(character: Model?, playerAttach: boolean?, tim
     end
 end
 
-function ragdoll:GetRagdollState()
-    return isRagdoll
+function ragdoll:GetRagdollState(character: Model?)
+    if not character then
+        character = lastChar
+    end
+    return character:GetAttribute("isRagdoll")
 end
 
 return ragdoll
